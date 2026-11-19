@@ -57,7 +57,11 @@ def uri(p):
     return None
 
 def parse(data):
-    document = yaml.safe_load(data)
+    # Support both Clash YAML and simple share-link subscriptions.
+    try:
+        document = yaml.safe_load(data)
+    except yaml.YAMLError:
+        document = None
     if isinstance(document, dict) and isinstance(document.get("proxies"), list):
         nodes = document["proxies"]
     elif isinstance(document, list):
@@ -71,8 +75,28 @@ def parse(data):
                 links = [x.strip() for x in decoded.splitlines() if x.strip().startswith(allowed)]
             except (ValueError, UnicodeError):
                 pass
+        if not links and "[Proxy]" in data:
+            # Surge-style subscriptions: convert the common SS node syntax.
+            section = False
+            for raw_line in data.splitlines():
+                line = raw_line.strip()
+                if line.startswith("[") and line.endswith("]"):
+                    section = (line.lower() == "[proxy]")
+                    continue
+                if not section or not line or line.startswith(("#", ";")) or "=" not in line:
+                    continue
+                name, settings = line.split("=", 1)
+                parts = [x.strip() for x in settings.split(",")]
+                if len(parts) < 3 or parts[0].lower() != "ss":
+                    continue
+                options = dict(x.split("=", 1) for x in parts[3:] if "=" in x)
+                entry = {"type":"ss", "name":name.strip(), "server":parts[1], "port":parts[2],
+                         "cipher":options.get("encrypt-method"), "password":options.get("password")}
+                link = uri(entry)
+                if link:
+                    links.append(link)
         if not links:
-            raise ValueError("No supported share links or Clash proxies")
+            raise ValueError("No supported share links or Clash/Surge proxies")
         return list(dict.fromkeys(links))
     links = list(dict.fromkeys(x for x in (uri(p) for p in nodes if isinstance(p, dict)) if x))
     if not links:
