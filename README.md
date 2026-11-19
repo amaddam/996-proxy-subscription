@@ -1,25 +1,31 @@
 # Subscription converter
 
-GitHub Actions fetches two upstream subscriptions every six hours, converts them into static v2rayN share-link subscriptions, and deploys the generated files to Cloudflare Workers Static Assets. No Worker JavaScript runs when clients download the static files.
+GitHub Actions fetches two upstream subscriptions every six hours, converts them into static v2rayN share-link subscriptions, and deploys the generated files to Cloudflare Workers Static Assets. Static asset requests are served without invoking Worker JavaScript.
 
 ## One-time setup
 
-### GitHub repository secrets
+### 1. Cloudflare Worker
+
+Create a Worker named `proxy-subscription-996` in your Cloudflare account and make sure your `workers.dev` subdomain is enabled. The repository's `wrangler.jsonc` deploys the `site/` directory as static assets.
+
+### 2. Cloudflare API credentials
+
+Create an API token at https://dash.cloudflare.com/profile/api-tokens. For the first deployment (which creates or updates the Worker), use the **Edit Cloudflare Workers** template, scoped to the account that owns the Worker. If you create the Worker manually first, a narrower Workers Editor token scoped to that Worker can be used.
+
+Find the Account ID in the Cloudflare dashboard.
+
+### 3. GitHub repository secrets
 
 Open **Settings → Secrets and variables → Actions** and add:
 
 - `CLASH_SUB_URL`: `https://996chat.com/ClashRPzlPmfQIB8s.yaml`
 - `OTHER_SUB_URL`: `https://996chat.com/otherROk20sM4l5.yaml`
-- `CF_ACCOUNT_ID`: your Cloudflare Account ID.
-- `CF_API_TOKEN`: a Cloudflare API token permitted to deploy Workers (Workers Scripts: Edit, plus required account-level Workers permissions).
+- `CLOUDFLARE_ACCOUNT_ID`: your Cloudflare Account ID.
+- `CLOUDFLARE_API_TOKEN`: the Cloudflare API token.
 
-### Cloudflare
+Never put the API token or upstream subscription URLs in committed files.
 
-1. In Cloudflare, create a Workers project named `proxy-subscription-996`, or let the first Wrangler deployment create it.
-2. Ensure the account has a `workers.dev` subdomain enabled.
-3. The repository contains `wrangler.jsonc`, configured for static assets in `./site`.
-
-### Deploy
+## Deploy
 
 Run **Actions → Update subscriptions → Run workflow**, or wait for the six-hour schedule. The workflow converts the inputs and deploys `site/` using Wrangler.
 
